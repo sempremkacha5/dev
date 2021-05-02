@@ -1,0 +1,39 @@
+variables:
+  - name: API_KEY
+    value: nmVhLE0Wg6LIvwOwUaxz761m1Jf
+  - name: ENV_ID
+    value: TestEnvironment-5c4f34c2-3ae4-4025-bd2c-a9d297d9efbc
+  - name: PROFILE_ID
+    value: TestProfile-f748eb4d-b75f-4b89-8cf4-b5609fb0c840
+  - name: TESTCASE_ID
+    value: TestCase-2fdd43de-04a3-496d-810a-08ecb2820554
+  - name: EXECUTION_STATUS
+    value: "Created"
+  - name: URL
+    value: https://demo.itss-digital.com/IBSTestAutomation
+jobs:
+  - job: ExecuteTest
+    steps:
+      - bash: |
+          EXECUTION_ID=$(curl -s -X POST  -d "api_key=$API_KEY&environmentId=$ENV_ID&profileId=$PROFILE_ID" $URL/testcases/$TESTCASE_ID/execute | jq '._id')
+          echo "##vso[task.setvariable variable=executionId;isOutput=true]$EXECUTION_ID"
+        displayName: GetExecId
+        name: getExecId
+
+  - job: Checkresult
+    dependsOn: ExecuteTest
+    variables:
+      EXECUTION_ID : $[ dependencies.ExecuteTest.outputs['getExecId.executionId'] ]
+      EXECUTION_STATUS : "Created"
+    steps:
+      - bash: |
+          while [ $EXECUTION_STATUS == 'Running'|| $EXECUTION_STATUS == 'Created' ]
+          do
+              EXECUTION_STATUS=$(curl -s -X POST  -d "api_key=$API_KEY" $URL/testcases/$TESTCASE_ID/executions/$EXECUTION_ID | jq '.status')
+              sleep 2
+          done
+
+          if [ $EXECUTION_STATUS != "Success" ]
+          then
+              exit 1
+          fi
